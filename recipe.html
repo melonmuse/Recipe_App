@@ -1,24 +1,45 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CookNote: AI Recipe Book</title>
-    <link rel="stylesheet" href="css/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recipe | CookNote</title>
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <nav class="navbar">
-        <a href="index.html" class="logo">🍳 CookNote</a>
-        <ul class="nav-links">
-        <li><a href="index.html" class="active">Home</a></li>
-        <li><a href="add-recipe.html">Create Recipe</a></li>
-        </ul>
-    </nav>
-    <main>
+  <nav class="navbar">
+    <a href="index.html" class="logo">🍳 CookNote</a>
+    <ul class="nav-links">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="add-recipe.html">Create Recipe</a></li>
+    </ul>
+  </nav>
 
-    </main>
-    <footer>
-        CookNote: AI Recipe Book · SWE 401 Prototype
-    </footer>
+  <main>
+    <div id="message" class="message" hidden></div>
+
+    <article class="card">
+      <h1 id="recipe_title"></h1>
+
+      <h2>Ingredients</h2>
+      <hr>
+      <div class="unit-toggle">
+        <button type="button" id="original_btn" class="active">Original</button>
+        <button type="button" id="metric_btn">Metric</button>
+        <button type="button" id="us_btn">US</button>
+      </div>
+      <ul id="recipe_ingredients"></ul>
+
+      <h2>Instructions</h2>
+      <hr>
+      <ol id="recipe_steps"></ol>
+    </article>
+
+    <a href="index.html"> ← Back to my recipes</a>
+  </main>
+
+  <footer>CookNote: AI Recipe Book · SWE 401 Prototype</footer>
+
+  <script src="js/recipe.js"></script>
 </body>
 </html>

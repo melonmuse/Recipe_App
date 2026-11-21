@@ -17,19 +17,52 @@
     <main>
         <section class = "hero">
             <h1>CookNote: AI Recipe Book</h1>
-            <p><e>The place for all your recipes</e></p>
+            <p><em>The place for all your recipes</em></p>
         </section>
-        <section>
-            <h1>My Recipes</h1>
+        
+        <!--AI Recipes Section-->
+        <section class="card" id="ai-section">
+            <h2>AI Recipe Suggestions</h2>
+            <p class="hint">Type your ingredients separated by commas, then choose any dietary preferences.</p>
+
+            <div id="ai_message" class="message" hidden></div>
+
+            <div class="form-group">
+                <label for="ai_ingredients">Ingredients</label>
+                <input type="text" id="ai_ingredients" placeholder="e.g. chicken, rice, tomato">
+            </div>
+
+            <label>Dietary preferences (optional)</label>
+            <div class="diet-options">
+                <label><input type="checkbox" name="diet" value="vegetarian"> Vegetarian</label>
+                <label><input type="checkbox" name="diet" value="vegan"> Vegan</label>
+                <label><input type="checkbox" name="diet" value="gluten-free"> Gluten-free</label>
+                <label><input type="checkbox" name="diet" value="dairy-free"> Dairy-free</label>
+            </div>
+
+            <button type="button" id="generate_btn" class="btn-primary">Generate Recipe</button>
+
+            <div id="ai_result" hidden>
+                <h3 id="ai_title"></h3>
+                <h4>Ingredients</h4>
+                <ul id="ai_recipe_ingredients"></ul>
+                <h4>Instructions</h4>
+                <ol id="ai_recipe_steps"></ol>
+            </div>
+        </section>
+
+        <!--My Recipes Section-->
+         <section class="card">
+            <h2>My Recipes</h2>
             <hr>
+            <ul id="my_recipes"></ul>
         </section>
-        <section>
-            <h1>Saved AI Recipes</h1>
-            <hr>
-        </section>
+
     </main>
     <footer>
         CookNote: AI Recipe Book · SWE 401 Prototype
     </footer>
+    <script src="js/config.js"></script>
+    <script src="js/index.js"></script>
 </body>
 </html>

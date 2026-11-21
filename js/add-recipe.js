@@ -124,6 +124,12 @@ function handleErrors() {
         }
     }
 
+    //Check there is at least one ingredient
+    if (ingredients.length === 0) {
+        showMessage("Add at least one ingredient", 'error');
+        return false;
+    }
+
     //Check instructions
     steps = instructionsInput.value
     .split('\n')
@@ -173,5 +179,7 @@ function submitForm() {
 //Handle cancellation
 document.getElementById('cancel_btn').addEventListener('click', function() {
     orderForm.reset();
+    itemsContainer.innerHTML = '';
+    addRow();
     showMessage(`Recipe has been discarded`, 'cancel');
 });
