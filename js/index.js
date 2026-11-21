@@ -1,6 +1,5 @@
 //API Key
 const model = "gemini-3.8-flash";
-const url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent";
 
 //Ask for the API key once and remember it in this browser only
 function getApiKey() {
@@ -118,7 +117,8 @@ function buildPrompt(ingredients, diets) {
 }
 
 //Send the prompt to Gemini and return the recipe object
-async function askGemini(prompt) {
+async function askGemini(prompt,  model) {
+    const url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent";
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 30000);
 
@@ -208,11 +208,18 @@ async function generate() {
     button.textContent = 'Generating...';
 
     try {
-        const recipe = await askGemini(buildPrompt(ingredients, diets));
+        const prompt = buildPrompt(ingredients, diets);
+        let recipe;
+
+        try {
+            recipe = await askGemini(prompt, "gemini-3.5-flash-lite");  
+        } catch (firstError) {
+            console.log("First model failed, trying backup: " + firstError.message);
+            recipe = await askGemini(prompt, "gemini-3.6-flash"); 
+        }
         showAiRecipe(recipe);
     } catch (error) {
         console.log(error);
-        //Shows Google's reason (e.g. bad key) so you can see what went wrong
         showAiMessage('Could not get a recipe: ' + error.message, 'error');
     }
 
