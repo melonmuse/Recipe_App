@@ -1,3 +1,19 @@
+//API Key
+const model = "gemini-3.8-flash";
+const url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent";
+
+//Ask for the API key once and remember it in this browser only
+function getApiKey() {
+    let key = localStorage.getItem('gemini_api_key');
+    if (!key) {
+        key = prompt('Enter your Gemini API key (it is only saved in this browser):');
+        if (!key) throw new Error('No API key entered.');
+        key = key.trim();
+        localStorage.setItem('gemini_api_key', key);
+    }
+    return key;
+}
+
 //Unit sizes in grams (weight) or millilitres (volume)
 const UNITS = {
     weight: { g: 1, kg: 1000, oz: 28.3495, lb: 453.592 },
@@ -111,7 +127,7 @@ async function askGemini(prompt) {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "x-goog-api-key": apiKey
+                "x-goog-api-key": getApiKey()
             },
             body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
