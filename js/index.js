@@ -1,5 +1,20 @@
 // ===================== API KEY =====================
-const API_KEY = "AQ.Ab8RN6IGCA_mnFtQquuvDMuz__4I5k8m70_DBRsv0xixNcz7PQ";
+const model = "gemini-3.8-flash";
+const url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent";
+
+// Ask for the API key once and remember it in this browser only.
+// Pass true to forget the saved key and ask again (e.g. when Google rejects it).
+function getApiKey(askAgain = false) {
+    if (askAgain) localStorage.removeItem('gemini_api_key');
+
+    let key = localStorage.getItem('gemini_api_key');
+    if (!key) {
+        key = (prompt('Enter your Gemini API key (it is only saved in this browser):') || '').trim();
+        if (!key) throw new Error('No API key entered.');
+        localStorage.setItem('gemini_api_key', key);
+    }
+    return key;
+}
 
 
 // ===================== SETTINGS =====================
@@ -17,20 +32,23 @@ const ML_PER_TSP = 4.93;
 document.getElementById("generate_btn").addEventListener("click", generate);
 loadRecipes();
 
+// Ask for the API key when the page opens
+try { getApiKey(); } catch (error) { console.log(error.message); }
+
 // ===================== SAVED RECIPES =====================
 
 // This removes a recipe by first of all getting all the recipes, filtering them by
-// only showing the ones that don't match the deleted id, then saving the remaining 
+// only showing the ones that don't match the deleted id, then saving the remaining
 // in localStorage as a hard reset
 function deleteRecipe(id) {
     const remaining = getRecipes().filter(r => r.id !== id);
     localStorage.setItem("cooknote_recipes", JSON.stringify(remaining));
 }
 
-// An important function to load all saved recipes from localStorage. 
+// An important function to load all saved recipes from localStorage.
 function loadRecipes() {
-    // First it gets the values from localStorage and empties out the my_recipes section from the home page. 
-    // There is also a message when there are no recipes. 
+    // First it gets the values from localStorage and empties out the my_recipes section from the home page.
+    // There is also a message when there are no recipes.
     const list = document.getElementById("my_recipes");
     const recipes = getRecipes();
     list.innerHTML = "";
@@ -40,7 +58,7 @@ function loadRecipes() {
         return;
     }
 
-    // If there are, the system will loop through the localStorage and create an li for each recipe where it's content is 
+    // If there are, the system will loop through the localStorage and create an li for each recipe where it's content is
     // the recipe name, and the link if recipe.html?= + recipe.id (id was stored in storage). Then a delete button will be made next
     // to it that calls on deleteRecipe() then loadRecipes() again with the updated recipes and finally appending the li to the list
     recipes.forEach(recipe => {
@@ -89,7 +107,7 @@ async function askGemini(promptText, model, signal) {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
-            "x-goog-api-key": API_KEY
+            "x-goog-api-key": getApiKey()
         },
         body: JSON.stringify({
             contents: [{ parts: [{ text: promptText }] }],
@@ -102,6 +120,7 @@ async function askGemini(promptText, model, signal) {
 
     if (data.error) {
         if (data.error.status === "PERMISSION_DENIED" || /api key/i.test(data.error.message)) {
+            localStorage.removeItem('gemini_api_key'); // forget the bad key so the user is asked again next time
             throw new Error("The API key was not accepted.");
         }
         throw new Error(data.error.message);
@@ -169,7 +188,7 @@ function showAiRecipe(recipe) {
     document.getElementById("ai_result").hidden = false;
 }
 
-// "Generate Recipe" button. This allows for calling all the functions necassery to achieve 
+// "Generate Recipe" button. This allows for calling all the functions necassery to achieve
 // the AI recipe generation
 async function generate() {
     document.getElementById("ai_message").hidden = true;
