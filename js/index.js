@@ -1,233 +1,212 @@
-//API Key
-const model = "gemini-3.8-flash";
-
-//Ask for the API key once and remember it in this browser only
-function getApiKey() {
-    let key = localStorage.getItem('gemini_api_key');
-    if (!key) {
-        key = prompt('Enter your Gemini API key (it is only saved in this browser):');
-        if (!key) throw new Error('No API key entered.');
-        key = key.trim();
-        localStorage.setItem('gemini_api_key', key);
-    }
-    return key;
-}
-
-//Unit sizes in grams (weight) or millilitres (volume)
-const UNITS = {
-    weight: { g: 1, kg: 1000, oz: 28.3495, lb: 453.592 },
-    volume: { ml: 1, L: 1000, tsp: 4.92892, tbsp: 14.7868, cup: 236.588 }
-};
+// ===================== API KEY =====================
+const API_KEY = "AQ.Ab8RN6Jir9lIi0Y-ajzOmbwTwtv69BX5s4J344r-oe6JtDWzjQ";
 
 
-// --------------------------- SAVED RECIPES ---------------------------
+// ===================== SETTINGS =====================
 
-//Getting recipes from localStorage
-function getRecipes() {
-    const saved = localStorage.getItem('cooknote_recipes');
-    return JSON.parse(saved) || [];
-}
+// Models to try, in order. If the first one is busy, the next one is used.
+const MODELS = ["gemini-3.5-flash-lite", "gemini-3.6-flash"];
 
-//Deleting a recipe from localStorage
+// Important conversions for imperical conversion
+const GRAMS_PER_OZ = 28.35;
+const ML_PER_CUP = 236.6;
+const ML_PER_TBSP = 14.79;
+const ML_PER_TSP = 4.93;
+
+// ===================== START =====================
+document.getElementById("generate_btn").addEventListener("click", generate);
+loadRecipes();
+
+// ===================== SAVED RECIPES =====================
+
+// This removes a recipe by first of all getting all the recipes, filtering them by
+// only showing the ones that don't match the deleted id, then saving the remaining 
+// in localStorage as a hard reset
 function deleteRecipe(id) {
     const remaining = getRecipes().filter(r => r.id !== id);
-    localStorage.setItem('cooknote_recipes', JSON.stringify(remaining));
+    localStorage.setItem("cooknote_recipes", JSON.stringify(remaining));
 }
 
-//Showing the saved recipes on the page
+// An important function to load all saved recipes from localStorage. 
 function loadRecipes() {
-    const list = document.getElementById('my_recipes');
+    // First it gets the values from localStorage and empties out the my_recipes section from the home page. 
+    // There is also a message when there are no recipes. 
+    const list = document.getElementById("my_recipes");
     const recipes = getRecipes();
-    list.innerHTML = '';
+    list.innerHTML = "";
 
     if (recipes.length === 0) {
-        list.innerHTML = '<li>No recipes yet. Start uploading your recipes <a href="add-recipe.html">here!</a>.</li>';
+        list.innerHTML = '<li style="text-align: center">No recipes yet. Start uploading your recipes <a href="add-recipe.html">here!</a></li>';
         return;
     }
 
-    for (let i = 0; i < recipes.length; i++) {
-        const recipe = recipes[i];
+    // If there are, the system will loop through the localStorage and create an li for each recipe where it's content is 
+    // the recipe name, and the link if recipe.html?= + recipe.id (id was stored in storage). Then a delete button will be made next
+    // to it that calls on deleteRecipe() then loadRecipes() again with the updated recipes and finally appending the li to the list
+    recipes.forEach(recipe => {
+        const li = document.createElement("li");
 
-        const li = document.createElement('li');
-        const link = document.createElement('a');
+        const link = document.createElement("a");
         link.textContent = recipe.title;
-        link.href = 'recipe.html?id=' + recipe.id;
+        link.href = "recipe.html?id=" + recipe.id;
 
-        const deleteBtn = document.createElement('button');
-        deleteBtn.textContent = 'Delete';
-        deleteBtn.type = 'button';
-        deleteBtn.addEventListener('click', function() {
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.textContent = "Delete";
+        deleteBtn.addEventListener("click", () => {
             if (confirm('Delete "' + recipe.title + '"? This cannot be undone.')) {
                 deleteRecipe(recipe.id);
                 loadRecipes();
             }
         });
 
-        li.appendChild(link);
-        li.appendChild(document.createTextNode(' '));
-        li.appendChild(deleteBtn);
+        li.append(link, " ", deleteBtn);
         list.appendChild(li);
-    }
+    });
 }
 
 
-//  ---------------------------  AI RECIPE  --------------------------- 
+// ===================== AI RECIPE =====================
 
-//Show messages in the AI section
-function showAiMessage(text, type) {
-    const messageBox = document.getElementById('ai_message');
-    messageBox.textContent = text;
-    messageBox.className = 'message ' + type;
-    messageBox.hidden = false;
-}
-
-//Convert a quantity and round to 2 decimal places
-function convert(quantity, fromUnit, toUnit, category) {
-    const factors = UNITS[category];
-    const result = quantity * (factors[fromUnit] / factors[toUnit]);
-    return Math.round(result);
-}
-
-//Turn one ingredient into a line of text
-function ingredientText(ing) {
-    if (ing.unit === 'g' || ing.unit === 'kg') {
-        const oz = convert(ing.quantity, ing.unit, 'oz', 'weight');
-        return '(' + ing.quantity + ' ' + ing.unit + ' / ' + oz + ' oz) ' + ing.name;
-    }
-    if (ing.unit === 'ml' || ing.unit === 'L') {
-        const cups = convert(ing.quantity, ing.unit, 'cup', 'volume');
-        return '(' + ing.quantity + ' ' + ing.unit + ' / ' + cups + ' cup) ' + ing.name;
-    }
-    if (ing.unit === 'piece') {
-        return ing.quantity + ' ' + ing.name;
-    }
-    return ing.quantity + ' ' + ing.unit + ' ' + ing.name;
-}
-
-//Write the message for the AI
+// This is the structure of the prompt that the system will send to Gemini to get the perfect response every single time
+// that fits the format for loading and display the result
 function buildPrompt(ingredients, diets) {
-    let prompt = 'Suggest ONE recipe using some or all of these ingredients: ' + ingredients.join(', ') + '. ';
+    let text = "Suggest ONE recipe using some or all of these ingredients: " + ingredients.join(", ") + ". ";
     if (diets.length > 0) {
-        prompt += 'The recipe must be: ' + diets.join(', ') + '. ';
+        text += "The recipe must be: " + diets.join(", ") + ". ";
     }
-    prompt += 'Use only these units: g, ml, tsp, tbsp, piece, pinch. ';
-    prompt += 'Reply ONLY with a JSON object in exactly this format: ';
-    prompt += '{"title": "", "ingredients": [{"name": "", "quantity": 0, "unit": ""}], "steps": [""]}';
-    return prompt;
+    text += "Use only these units: g, ml, tsp, tbsp, piece, pinch. ";
+    text += 'Reply ONLY with JSON in exactly this format: ';
+    text += '{"title": "", "ingredients": [{"name": "", "quantity": 0, "unit": ""}], "steps": [""]}';
+    return text;
 }
 
-//Send the prompt to Gemini and return the recipe object
-async function askGemini(prompt,  model) {
+// Ask one Gemini model for a recipe (gives up after 30 seconds)
+async function askGemini(promptText, model, signal) {
     const url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent";
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 30000);
 
-    try {
-        const response = await fetch(url, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "x-goog-api-key": getApiKey()
-            },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: {
-                    responseMimeType: "application/json",
-                    thinkingConfig: { thinkingLevel: "low" }
-                }
-            }),
-            signal: controller.signal
-        });
+    const response = await fetch(url, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": API_KEY
+        },
+        body: JSON.stringify({
+            contents: [{ parts: [{ text: promptText }] }],
+            generationConfig: { responseMimeType: "application/json" }
+        }),
+        signal: signal
+    });
 
-        const data = await response.json();
-        console.log(data);  
+    const data = await response.json();
 
-        if (data.error) {
-            throw new Error(data.error.message);
+    if (data.error) {
+        if (data.error.status === "PERMISSION_DENIED" || /api key/i.test(data.error.message)) {
+            throw new Error("The API key was not accepted.");
         }
-
-        const text = data.candidates[0].content.parts[0].text;
-        return JSON.parse(text);
-
-    } catch (error) {
-        if (error.name === 'AbortError') {
-            throw new Error('Google took longer than 30 seconds to answer.');
-        }
-        throw error;
-
-    } finally {
-        clearTimeout(timer);
+        throw new Error(data.error.message);
     }
+
+    return JSON.parse(data.candidates[0].content.parts[0].text);
 }
 
-//Show the AI recipe
+// Try each model until one works
+async function getAiRecipe(promptText) {
+    const signal = AbortSignal.timeout(30000);
+    let lastError;
+    for (const model of MODELS) {
+        try {
+            return await askGemini(promptText, model, signal);
+        } catch (error) {
+            if (error.message.includes("API key")) throw error;
+            console.log(model + " failed: " + error.message);
+            lastError = error;
+        }
+    }
+    throw lastError;
+}
+
+// Small helper function to deal with US conversion to convert mL to cup
+// tbsp, or tsp based on how much mL there is
+function usVolume(ml) {
+    if (ml >= 240) return `${Math.round(ml / ML_PER_CUP)} cup`;
+    if (ml >= 15)  return `${Math.round(ml / ML_PER_TBSP)} tbsp`;
+    return `${Math.round(ml / ML_PER_TSP)} tsp`;
+}
+
+// Gemini output of ingredients that includes all metric and imperial units
+// Or the original like piece or pinch
+function ingredientText(ing) {
+    const { name, quantity, unit } = ing;
+
+    if (unit === "g")  return `${quantity} g (${Math.round(quantity / GRAMS_PER_OZ)} oz) ${name}`;
+    if (unit === "kg") return `${quantity} kg (${Math.round(quantity * 1000 / GRAMS_PER_OZ)} oz) ${name}`;
+    if (unit === "ml") return `${quantity} ml (${usVolume(quantity)}) ${name}`;
+    if (unit === "L")  return `${quantity} L (${usVolume(quantity * 1000)}) ${name}`;
+    if (unit === "piece") return `${quantity} ${name}`;
+    return `${quantity} ${unit} ${name}`;
+}
+
+
+// Same thing as before, clearing a list and looping through
+// the items to create an element, make the item the content
+// and then append it to the list
+function fillList(listId, items) {
+    const list = document.getElementById(listId);
+    list.innerHTML = "";
+    items.forEach(item => {
+        const li = document.createElement("li");
+        li.textContent = item;
+        list.appendChild(li);
+    });
+}
+
+// Displaying the AI recipe ingreidents and steps using the fillList function
 function showAiRecipe(recipe) {
-    document.getElementById('ai_title').textContent = recipe.title;
-
-    const ingredientsList = document.getElementById('ai_recipe_ingredients');
-    ingredientsList.innerHTML = '';
-    for (let i = 0; i < recipe.ingredients.length; i++) {
-        const li = document.createElement('li');
-        li.textContent = ingredientText(recipe.ingredients[i]);
-        ingredientsList.appendChild(li);
-    }
-
-    const stepsList = document.getElementById('ai_recipe_steps');
-    stepsList.innerHTML = '';
-    for (let i = 0; i < recipe.steps.length; i++) {
-        const li = document.createElement('li');
-        li.textContent = recipe.steps[i];
-        stepsList.appendChild(li);
-    }
-
-    document.getElementById('ai_result').hidden = false;
+    document.getElementById("ai_title").textContent = recipe.title;
+    fillList("ai_recipe_ingredients", recipe.ingredients.map(ingredientText));
+    fillList("ai_recipe_steps", recipe.steps);
+    document.getElementById("ai_result").hidden = false;
 }
 
-//Generate button
+// "Generate Recipe" button. This allows for calling all the functions necassery to achieve 
+// the AI recipe generation
 async function generate() {
-    document.getElementById('ai_message').hidden = true;
-    document.getElementById('ai_result').hidden = true;
+    document.getElementById("ai_message").hidden = true;
+    document.getElementById("ai_result").hidden = true;
 
-    //Ingredients typed as "chicken, rice, tomato"
-    const ingredients = document.getElementById('ai_ingredients').value
-        .split(',')
+    // Validation of inputs
+    const ingredients = document.getElementById("ai_ingredients").value
+        .split(",")
         .map(s => s.trim())
-        .filter(s => s !== '');
+        .filter(s => s !== "");
 
     if (ingredients.length === 0) {
-        showAiMessage('Please enter at least one ingredient.', 'error');
+        showMessage("Please enter at least one ingredient.", "error", "ai_message");
         return;
     }
 
-    //Ticked dietary checkboxes
-    const diets = [];
-    document.querySelectorAll('input[name="diet"]:checked').forEach(c => diets.push(c.value));
+    // Retrieving user diet preferences
+    const diets = [...document.querySelectorAll('input[name="diet"]:checked')].map(c => c.value);
 
-    const button = document.getElementById('generate_btn');
+    // While loading, the button is disabled and displays generating
+    const button = document.getElementById("generate_btn");
     button.disabled = true;
-    button.textContent = 'Generating...';
+    button.textContent = "Generating...";
 
+    // Performs try-catch of showAIRecipe
     try {
-        const prompt = buildPrompt(ingredients, diets);
-        let recipe;
-
-        try {
-            recipe = await askGemini(prompt, "gemini-3.5-flash-lite");  
-        } catch (firstError) {
-            console.log("First model failed, trying backup: " + firstError.message);
-            recipe = await askGemini(prompt, "gemini-3.6-flash"); 
-        }
+        const recipe = await getAiRecipe(buildPrompt(ingredients, diets));
         showAiRecipe(recipe);
     } catch (error) {
-        console.log(error);
-        showAiMessage('Could not get a recipe: ' + error.message, 'error');
+        const message = error.name === "TimeoutError"
+            ? "Google took longer than 30 seconds to answer."
+            : error.message;
+        showMessage("Could not get a recipe: " + message, "error", "ai_message");
+    } finally {
+        button.disabled = false;
+        button.textContent = "Generate Recipe";
     }
-
-    button.disabled = false;
-    button.textContent = 'Generate Recipe';
 }
 
 
-//--------------- START ---------------
-document.getElementById('generate_btn').addEventListener('click', generate);
-loadRecipes();

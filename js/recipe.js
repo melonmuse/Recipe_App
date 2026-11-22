@@ -1,122 +1,137 @@
-//Getting recipes from localStorage
-function getRecipes() {
-    const saved = localStorage.getItem('cooknote_recipes');
-    return JSON.parse(saved) || [];
+// ===== 1. Loading data =====
+
+// Read the recipe id from the address, e.g. recipe.html?id=abc123. This is the main method
+// when the recipe page is open. When each recipe was saved, they are given a unique id which
+// is reflected in their links. First retreive the unique id from the link (which looks like ?id=......)
+// save that id, and then use getRecipe() to fetch a recipe with that matching id from localStorage
+const params = new URLSearchParams(window.location.search);
+const recipeId = params.get('id');
+const recipe = getRecipe(recipeId);
+
+if (!recipe) {
+    showMessage('Recipe not found.', 'error', 'message');
+} else {
+    document.getElementById('recipe_title').textContent = recipe.title;
+    showSteps(recipe);
+    showIngredients(recipe, 'original');
+
+    setupUnitButton(recipe, 'original_btn', 'original');
+    setupUnitButton(recipe, 'metric_btn', 'metric');
+    setupUnitButton(recipe, 'us_btn', 'us');
 }
 
-//Getting one recipe by its id
+// Get one recipe by its id using the getRecipe() function by first getting all 
+// the recipes, looping through them until an id matches, then return the match or null
 function getRecipe(id) {
-    return getRecipes().find(r => r.id === id);
+    const recipes = getRecipes();
+    for (const recipe of recipes) {
+        if (recipe.id === id) {
+            return recipe;
+        }
+    }
+    return null;
 }
 
-//Show error messages
-function showMessage(text, type) {
-    const messageBox = document.getElementById('message');
-    messageBox.textContent = text;
-    messageBox.className = 'message ' + type;
-    messageBox.hidden = false;
-}
+// ===== 2. Unit conversion =====
 
-//Unit sizes in grams (weight) or millilitres (volume)
-const UNITS = {
-    weight: { g: 1, kg: 1000, oz: 28.3495, lb: 453.592 },
-    volume: { ml: 1, L: 1000, tsp: 4.92892, tbsp: 14.7868, cup: 236.588 }
-};
-
-//Find which group a unit belongs to
-function getCategory(unit) {
-    if (unit in UNITS.weight) return 'weight';
-    if (unit in UNITS.volume) return 'volume';
-    return null;    // for non-unit items
-}
-
-//Convert a quantity and round to 2 decimal places
-function convert(quantity, fromUnit, toUnit) {
-    const category = getCategory(fromUnit);
-    const factors = UNITS[category];
-    const result = quantity * (factors[fromUnit] / factors[toUnit]);
-    return Math.round(result * 100) / 100;
-}
-
-//Pick a US unit for a metric measurement
+// Convert to imperial units. If a unit is in g or kg, it performs the necaserry conversion
+// Same with mL and L but this time it converts to either tsp, cup, or tbsp depending on
+// quanitity in mL. Anything else like tbsp, tsp, piece, pinch are returned as they are
 function toUS(quantity, unit) {
     if (unit === 'g' || unit === 'kg') {
-        const grams = quantity * UNITS.weight[unit];
-        const target = grams >= 453.592 ? 'lb' : 'oz';      
-        return { quantity: convert(quantity, unit, target), unit: target };
+        const grams = quantity * GRAMS_PER[unit];
+        return { quantity: Math.round(grams / GRAMS_PER.oz), unit: 'oz' };
     }
+
     if (unit === 'ml' || unit === 'L') {
-        const ml = quantity * UNITS.volume[unit];
-        let target = 'tsp';
-        if (ml >= 59.15) target = 'cup';                     
-        else if (ml >= 14.79) target = 'tbsp';               
-        return { quantity: convert(quantity, unit, target), unit: target };
+        const ml = quantity * ML_PER[unit];
+
+        let newUnit = 'tsp';
+        if (ml >= 240) {
+            newUnit = 'cup';
+        } else if (ml >= 15) {
+            newUnit = 'tbsp';
+        }
+
+        return { quantity: Math.round(ml / ML_PER[newUnit]), unit: newUnit };
     }
-    return { quantity: quantity, unit: unit };               
+
+    return { quantity: quantity, unit: unit };
 }
 
-//Pick a metric unit for a US measurement
+// Convert to metric units. If a unit it in oz or pounds, it performs the necassery conversion
+// Same with cup to mL. Anything else like tbsp, tsp, piece, pinch are returned as they are
 function toMetric(quantity, unit) {
     if (unit === 'oz' || unit === 'lb') {
-        const grams = quantity * UNITS.weight[unit];
-        const target = grams >= 1000 ? 'kg' : 'g';           
-        return { quantity: convert(quantity, unit, target), unit: target };
+        const grams = quantity * GRAMS_PER[unit];
+        return { quantity: Math.round(grams), unit: 'g' };
     }
+
     if (unit === 'cup') {
-        const ml = quantity * UNITS.volume[unit];
-        const target = ml >= 1000 ? 'L' : 'ml';              
-        return { quantity: convert(quantity, unit, target), unit: target };
+        const ml = quantity * ML_PER.cup;
+        return { quantity: Math.round(ml), unit: 'ml' };
     }
-    return { quantity: quantity, unit: unit };            
+
+    return { quantity: quantity, unit: unit };
 }
 
-//Find which recipe to show from the address
-const params = new URLSearchParams(window.location.search);
-const id = params.get('id');
-const recipe = getRecipe(id);
 
-//Draw the ingredients in the chosen system: 'original', 'metric' or 'us'
-function drawIngredients(system) {
+// ===== 3. Showing the recipe on the page =====
+
+// Show the list of steps by getting steps from the saved object, creating a list tag, 
+// adding the step to the list tag, and then appending it to the recipe_steps section in the
+// HTML
+function showSteps(recipe) {
+    const stepsList = document.getElementById('recipe_steps');
+
+    for (const step of recipe.steps) {
+        const li = document.createElement('li');
+        li.textContent = step;
+        stepsList.appendChild(li);
+    }
+}
+
+// Show the ingredients in the chosen system: 'original', 'metric' or 'us'
+// First, get the section where ingredients are saved which is recipe_ingredients and empty it, 
+// then get the ingredients from the object. Then, if system is US or Metric, their respective functions 
+// are called or if it original, then it is left as it is. Then, create a list tag, add the ingreident in
+// its chosen unit in the list tag, and then append it to the recipe_ingredients
+function showIngredients(recipe, system) {
     const list = document.getElementById('recipe_ingredients');
-    list.innerHTML = '';
+    list.innerHTML = ''; 
 
-    for (let i = 0; i < recipe.ingredients.length; i++) {
-        const ing = recipe.ingredients[i];
-        let shown = { quantity: ing.quantity, unit: ing.unit };   // original
+    for (const ingredient of recipe.ingredients) {
+        let shown = { quantity: ingredient.quantity, unit: ingredient.unit };
 
-        if (system === 'us') shown = toUS(ing.quantity, ing.unit);
-        if (system === 'metric') shown = toMetric(ing.quantity, ing.unit);
+        if (system === 'us') {
+            shown = toUS(ingredient.quantity, ingredient.unit);
+        } else if (system === 'metric') {
+            shown = toMetric(ingredient.quantity, ingredient.unit);
+        }
 
         const li = document.createElement('li');
-        li.textContent = shown.quantity + ' ' + shown.unit + ' ' + ing.name;
+        li.textContent = shown.quantity + ' ' + shown.unit + ' ' + ingredient.name;
         list.appendChild(li);
     }
 }
 
-//Switch systems and highlight the selected button
-function setSystem(system, button) {
-    drawIngredients(system);
-    document.querySelectorAll('.unit-toggle button').forEach(b => b.classList.remove('active'));
-    button.classList.add('active');
+// When a unit button is clicked: redraw the ingredients and highlight that button.
+// For example, if the button imperial is clicked, all them will have their class="active"
+// be removed and the one that was selected getting the active tag. This allows for the orange highlight 
+// to show the user which measurement unit system they are using (imperial, metric, original)
+function setupUnitButton(recipe, buttonId, system) {
+    const button = document.getElementById(buttonId);
+
+    button.addEventListener('click', function () {
+        showIngredients(recipe, system);
+
+        const allButtons = document.querySelectorAll('.unit-toggle button');
+        for (const otherButton of allButtons) {
+            otherButton.classList.remove('active');
+        }
+        button.classList.add('active');
+    });
 }
 
-//Show the recipe
-if (!recipe) {
-    showMessage('Recipe not found.', 'error');
-} else {
-    document.getElementById('recipe_title').textContent = recipe.title;
 
-    const stepsList = document.getElementById('recipe_steps');
-    for (let i = 0; i < recipe.steps.length; i++) {
-        const li = document.createElement('li');
-        li.textContent = recipe.steps[i];
-        stepsList.appendChild(li);
-    }
 
-    drawIngredients('original');
-
-    //Unit buttons
-    document.getElementById('original_btn').addEventListener('click', function() { setSystem('original', this); });
-    document.getElementById('metric_btn').addEventListener('click', function() { setSystem('metric', this); });
-    document.getElementById('us_btn').addEventListener('click', function() { setSystem('us', this); });
-}

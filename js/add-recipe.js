@@ -1,17 +1,16 @@
-//Containers
+//Containers of the add-recipe form
 const orderForm = document.getElementById('upload_form');
 const itemsContainer = document.getElementById('ingredients_container');
 const titleInput = document.getElementById('recipe_title');
 const instructionsInput = document.getElementById('instructions');
-const messageBox = document.getElementById('message');
 
-// Shared attributes
+// Shared attributes used for localStorage
 let title = '';
 let ingredients = [];
 let steps = [];
 let recipe = null;
 
-//New row for ingredients
+// New row for ingredients
 const newRowHTML = `
     <div class="form-row item-row">
     <input 
@@ -62,7 +61,7 @@ itemsContainer.addEventListener('change', function() {
     }
 });
 
-//Remove any rows
+//Remove any rows after clicking the delete button
 itemsContainer.addEventListener('click', function(event) {
     if (!event.target.classList.contains('remove-row')) return;
     const allRows = itemsContainer.querySelectorAll('.item-row');
@@ -73,13 +72,6 @@ itemsContainer.addEventListener('click', function(event) {
         addRow();
     }
 });
-
-//Show error messages
-function showMessage(text, type) {
-    messageBox.textContent = text;
-    messageBox.className = 'message ' + type;  
-    messageBox.hidden = false;
-}
 
 // Handle form submission smoothly
 orderForm.addEventListener('submit', function(event) {
@@ -98,7 +90,7 @@ function handleErrors() {
     title = titleInput.value.trim();
     if (!title) {
         titleInput.classList.add('invalid');
-        showMessage("Enter a recipe title", 'error');
+        showMessage("Enter a recipe title", 'error', 'message');
         return false;
     }
 
@@ -115,7 +107,7 @@ function handleErrors() {
         const hasAll = quantity && unit && item;
 
         if (hasAny && !hasAll) {
-        showMessage("Fill out quantity, unit, and items!", 'error');
+        showMessage("Fill out quantity, unit, and items!", 'error', 'message');
         return false;
         }
 
@@ -126,11 +118,11 @@ function handleErrors() {
 
     //Check there is at least one ingredient
     if (ingredients.length === 0) {
-        showMessage("Add at least one ingredient", 'error');
+        showMessage("Add at least one ingredient", 'error', 'message');
         return false;
     }
 
-    //Check instructions
+    //Check there is at least one instruction
     steps = instructionsInput.value
     .split('\n')
     .map(s => s.trim())
@@ -138,7 +130,7 @@ function handleErrors() {
 
     if (steps.length === 0) {
         instructionsInput.classList.add('invalid');
-        showMessage("Enter at least one instruction", 'error');
+        showMessage("Enter at least one instruction", 'error', 'message');
         return false;
     }
 
@@ -160,7 +152,7 @@ function saveRecipe() {
         recipes.push(recipe);
         localStorage.setItem('cooknote_recipes', JSON.stringify(recipes));
     } catch (err) {
-        showMessage('Sorry, your recipe could not be saved. Storage may be full.', 'error');
+        showMessage('Sorry, your recipe could not be saved. Storage may be full.', 'error', 'message');
         return false;
     }
     return true;
@@ -172,7 +164,7 @@ function submitForm() {
     orderForm.reset();
     itemsContainer.innerHTML = '';
     addRow();
-    showMessage(`"${recipe.title}" has been uploaded! 😀`, 'success');
+    showMessage(`"${recipe.title}" has been uploaded! 😀`, 'success', 'message');
 }
 
 
@@ -181,5 +173,5 @@ document.getElementById('cancel_btn').addEventListener('click', function() {
     orderForm.reset();
     itemsContainer.innerHTML = '';
     addRow();
-    showMessage(`Recipe has been discarded`, 'cancel');
+    showMessage(`Recipe has been discarded`, 'cancel', 'message');
 });
