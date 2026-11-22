@@ -36,7 +36,7 @@ function loadRecipes() {
     list.innerHTML = "";
 
     if (recipes.length === 0) {
-        list.innerHTML = '<li style="text-align: center">No recipes yet. Start uploading your recipes <a href="add-recipe.html">here!</a></li>';
+        list.innerHTML = '<a style="text-align: center" href="add-recipe.html">Start uploading your recipes</a>';
         return;
     }
 
