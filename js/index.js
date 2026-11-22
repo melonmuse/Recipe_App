@@ -1,5 +1,5 @@
 // ===================== API KEY =====================
-const API_KEY = "AQ.Ab8RN6Jir9lIi0Y-ajzOmbwTwtv69BX5s4J344r-oe6JtDWzjQ";
+const API_KEY = "AQ.Ab8RN6IGCA_mnFtQquuvDMuz__4I5k8m70_DBRsv0xixNcz7PQ";
 
 
 // ===================== SETTINGS =====================
